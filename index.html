@@ -198,6 +198,25 @@
         .badge-easy { background: #27ae60; }
         .badge-normal { background: #3498db; }
         .badge-hard { background: #e74c3c; }
+
+        .btn-save {
+            background: linear-gradient(180deg, #9b59b6 0%, #8e44ad 100%);
+            text-shadow: 2px 2px 0 #8e44ad;
+        }
+
+        .session-info {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            color: #2c3e50;
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 2px dashed rgba(0,0,0,0.2);
+        }
+
+        .session-best {
+            font-weight: bold;
+            color: #8e44ad;
+        }
     </style>
 </head>
 <body>
@@ -238,6 +257,12 @@
                 <button class="diff-btn btn-normal" id="changeDiffBtn" style="margin-top: 10px; padding: 10px 20px; font-size: 14px;">
                     СМЕНИТЬ СЛОЖНОСТЬ
                 </button>
+                <button class="diff-btn btn-save" id="saveExitBtn" style="margin-top: 10px; padding: 10px 20px; font-size: 14px;">
+                    СОХРАНИТЬ И ВЫЙТИ
+                </button>
+                <div class="session-info">
+                    Лучший за сессию: <span class="session-best" id="sessionBest">0</span>
+                </div>
             </div>
         </div>
     </div>
@@ -295,14 +320,17 @@
         const gameOverScreen = document.getElementById('gameOverScreen');
         const restartBtn = document.getElementById('restartBtn');
         const changeDiffBtn = document.getElementById('changeDiffBtn');
+        const saveExitBtn = document.getElementById('saveExitBtn');
         const finalScoreEl = document.getElementById('finalScore');
         const bestScoreEl = document.getElementById('bestScore');
         const newRecordText = document.getElementById('newRecordText');
         const difficultyBadge = document.getElementById('difficultyBadge');
+        const sessionBestEl = document.getElementById('sessionBest');
 
         // Game state
         let gameState = 'menu';
         let score = 0;
+        let sessionBestScore = 0;
         let bestScores = JSON.parse(localStorage.getItem('flappyBestScores') || '{}');
 
         // Timing for frame-rate independence
@@ -428,6 +456,12 @@
                 showDifficultyMenu();
             });
 
+            saveExitBtn.addEventListener('click', () => saveAndExit());
+            saveExitBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                saveAndExit();
+            });
+
             canvas.addEventListener('click', handleInput);
             canvas.addEventListener('touchstart', (e) => {
                 e.preventDefault();
@@ -484,6 +518,11 @@
         function gameOver() {
             gameState = 'gameover';
 
+            // Update session best
+            if (score > sessionBestScore) {
+                sessionBestScore = score;
+            }
+
             const key = `best_${currentDifficulty}`;
             const currentBest = bestScores[key] || 0;
             const isNewRecord = score > currentBest;
@@ -495,6 +534,7 @@
 
             finalScoreEl.textContent = score;
             bestScoreEl.textContent = bestScores[key] || 0;
+            sessionBestEl.textContent = sessionBestScore;
 
             // Update badge
             const diff = DIFFICULTIES[currentDifficulty];
@@ -508,17 +548,26 @@
             }
 
             gameOverScreen.classList.remove('hidden');
+        }
 
-            // Send score to Telegram
+        function saveAndExit() {
+            // Send best session score to Telegram bot
             if (tg && tg.sendData) {
                 try {
                     tg.sendData(JSON.stringify({
-                        score: score,
+                        score: sessionBestScore,
                         difficulty: currentDifficulty
                     }));
                 } catch (e) {
                     console.log('Could not send data to Telegram');
+                    // Fallback: just close
+                    if (tg && tg.close) {
+                        tg.close();
+                    }
                 }
+            } else {
+                // Not in Telegram, just alert
+                alert(`Лучший результат сессии: ${sessionBestScore}`);
             }
         }
 
